@@ -1,7 +1,7 @@
 import Image from "next/image";
 import { Inter } from "next/font/google";
 import { Button } from "@/components/ui/button"
-import { useState } from "react";
+import { Dispatch, SetStateAction, useState } from "react";
 import Complete from "@/fetch_wrapper/autocomplete";
 import FindPath from "@/fetch_wrapper/findpath";
 import {
@@ -34,7 +34,6 @@ const handleSearch = async () =>{
 }
 //todo: implement
 
-
 const from_handleEnter = (event: React.KeyboardEvent) => {
   console.log("from_handleEnter");
   if (event.key === 'Enter') {
@@ -48,6 +47,16 @@ const to_handleEnter = (event: React.KeyboardEvent) => {
   }
 };
 
+const handleComplete = async(str: string, setter: Dispatch<SetStateAction<string>>)=>{
+  setter(str); //set string
+  let result = await Complete(str);
+  if(setter === setFrom){
+    setFs(result);
+  }else{
+    setTs(result);
+  }
+}
+
 
   return (
     <main>
@@ -57,7 +66,7 @@ const to_handleEnter = (event: React.KeyboardEvent) => {
         </div>
         <div className="flex justify-center items-center space-x-24 ">
         <Command className="w-96">
-          <CommandInput placeholder="From..." value={from} onValueChange={setFrom} onKeyDown={from_handleEnter}/>
+          <CommandInput placeholder="From..." value={from} onValueChange={(t)=> handleComplete(t, setFrom)} onKeyDown={from_handleEnter}/>
           <CommandList>
           <CommandGroup heading="Suggestions">
           {
@@ -68,7 +77,7 @@ const to_handleEnter = (event: React.KeyboardEvent) => {
         </Command>
 
         <Command className="w-96">
-          <CommandInput placeholder="To..." value={to} onValueChange={setTo} onKeyDown={to_handleEnter}/>
+          <CommandInput placeholder="To..." value={to} onValueChange={(t)=> handleComplete(t, setTo)} onKeyDown={to_handleEnter}/>
           <CommandList>
           <CommandGroup heading="Suggestions">
           {
