@@ -334,7 +334,7 @@ export default function Home() {
                 className="flex flex-col items-center text-center mb-2"
               >
                 <a
-                  href={`https://en.wikipedia.org/wiki/${encodeURIComponent(step)}`}
+                  href={`https://en.wikipedia.org/wiki/${encodeURIComponent(step).replace(/%20/g, "_")}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-blue-600 hover:underline"
