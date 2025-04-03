@@ -3,14 +3,15 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import Complete, { type CompletionResult } from "@/fetch_wrapper/autocomplete";
-import FindPath from "@/fetch_wrapper/findpath";
+import Complete, { type CompletionResult } from "@/api_wrapper/autocomplete";
+import { FindPath } from "@/api_wrapper/findpath";
 import { AutoComplete } from "@/components/autocomplete";
-import { UnauthorizedError } from "@/fetch_wrapper/error";
+import { UnauthorizedError } from "@/api_wrapper/error";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
-import { ExplanationModal } from "@/components/explanation-modal";
 import WikigraphExplanation from "@/components/wikigraph-explanation";
+import { ClaimEntry } from "@/api_wrapper/rank";
+import Link from "next/link";
 
 export default function Home() {
   // From input state
@@ -40,6 +41,9 @@ export default function Home() {
   // Path result state
   const [pathResult, setPathResult] = useState<string[]>([]);
 
+  //Entry claiming state
+  const [entryId, setEntryId] = useState<string | null>(null);
+
   // Loading state for search operation
   const [isSearching, setIsSearching] = useState<boolean>(false);
 
@@ -48,6 +52,13 @@ export default function Home() {
   const [fromError, setFromError] = useState<string | null>(null);
   const [toError, setToError] = useState<string | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [hasSpacesInResults, setHasSpacesInResults] = useState<boolean>(false);
+
+  // Add these state variables after the other state declarations (after hasSpacesInResults)
+  const [claimName, setClaimName] = useState<string>("");
+  const [isClaimingEntry, setIsClaimingEntry] = useState<boolean>(false);
+  const [claimError, setClaimError] = useState<string | null>(null);
+  const [claimSuccess, setClaimSuccess] = useState<boolean>(false);
 
   // Fetch suggestions for "From" input
   useEffect(() => {
@@ -149,11 +160,16 @@ export default function Home() {
       setAuthError(null);
       setSearchError(null);
       const result = await FindPath(
-        fromSelectedItem.Offset,
-        toSelectedItem.Offset,
+        {
+          from_offset: fromSelectedItem.Offset,
+          to_offset: toSelectedItem.Offset,
+          from_title: fromSelectedItem.Title,
+          to_title: toSelectedItem.Title,
+        },
         password,
       );
-      setPathResult(result);
+      setPathResult(result.path);
+      setEntryId(result.entry_id);
     } catch (error) {
       if (error instanceof UnauthorizedError) {
         setAuthError(error.message);
@@ -164,6 +180,40 @@ export default function Home() {
     } finally {
       // Set searching state to false to hide the spinner
       setIsSearching(false);
+    }
+  };
+
+  // Add this function after the handleSearch function
+  const handleClaimEntry = async () => {
+    if (!entryId || !claimName.trim()) {
+      return;
+    }
+
+    setIsClaimingEntry(true);
+    setClaimError(null);
+    setClaimSuccess(false);
+
+    try {
+      const result = await ClaimEntry(
+        {
+          entry_id: entryId,
+          name: claimName.trim(),
+        },
+        password,
+      );
+
+      if (result.claimed) {
+        setClaimSuccess(true);
+      }
+    } catch (error) {
+      if (error instanceof UnauthorizedError) {
+        setAuthError(error.message);
+      } else {
+        console.error("Error claiming entry:", error);
+        setClaimError("Failed to claim entry. Please try again.");
+      }
+    } finally {
+      setIsClaimingEntry(false);
     }
   };
 
@@ -222,6 +272,15 @@ export default function Home() {
     updateToSelectedItem();
   }, [toSelectedValue, toSearchValue, password]);
 
+  // Add this effect to check for spaces in path results when they change
+  useEffect(() => {
+    if (pathResult.length > 0) {
+      const hasSpaces = pathResult.some((step) => step.includes(" "));
+      setHasSpacesInResults(hasSpaces);
+    } else {
+      setHasSpacesInResults(false);
+    }
+  }, [pathResult]);
   return (
     <main className="min-h-screen flex flex-col items-center p-4">
       <div className="w-full max-w-md flex flex-col items-center">
@@ -230,7 +289,9 @@ export default function Home() {
           <Button variant="link">
             <a href="https://github.com/notzree/wikigraph_server">@github</a>
           </Button>
-
+          <Button variant="link">
+            <Link href="/leaderboard">leaderboard</Link>
+          </Button>
           <WikigraphExplanation />
         </div>
         {authError && (
@@ -327,24 +388,103 @@ export default function Home() {
       {!isSearching && pathResult.length > 0 && (
         <div className="w-full max-w-md mt-8 p-4 border rounded-lg shadow-sm">
           <h2 className="font-bold mb-4 text-center">Path Result:</h2>
-          <ul className="flex flex-col items-center">
+
+          {hasSpacesInResults && (
+            <Alert className="mb-4">
+              <AlertDescription>
+                <strong>Warning:</strong> Some results contain spaces and may
+                have case sensitivity issues. Wikipedia URLs are case-sensitive
+                (e.g., Lebron James is different from lebron james). If a link
+                doesn&apos;t work, try using the Search on Wikipedia button.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <ul className="flex flex-col items-center w-full">
             {pathResult.map((step, i) => (
               <li
                 key={i}
-                className="flex flex-col items-center text-center mb-2"
+                className="flex flex-col items-center text-center mb-2 w-full"
               >
-                <a
-                  href={`https://en.wikipedia.org/wiki/${encodeURIComponent(step).replace(/%20/g, "_")}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline"
-                >
-                  {step}
-                </a>
+                <div className="flex items-center justify-center gap-2 w-full">
+                  <a
+                    href={`https://en.wikipedia.org/wiki/${encodeURIComponent(step).replace(/%20/g, "_")}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline"
+                  >
+                    {step}
+                  </a>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      window.open(
+                        `https://en.wikipedia.org/w/index.php?fulltext=1&search=${encodeURIComponent(step)}&title=Special%3ASearch&ns0=1`,
+                        "_blank",
+                      )
+                    }
+                  >
+                    Search on Wikipedia
+                  </Button>
+                </div>
                 {i < pathResult.length - 1 && <span className="my-1">↓</span>}
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {!isSearching && entryId && !claimSuccess && (
+        <div className="w-full max-w-md mt-6 p-4 border rounded-lg shadow-sm">
+          <h2 className="font-bold mb-4 text-center">Claim This Path</h2>
+
+          {claimError && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertDescription>{claimError}</AlertDescription>
+            </Alert>
+          )}
+
+          <div className="space-y-4">
+            <div className="w-full">
+              <label
+                htmlFor="claimName"
+                className="block text-sm font-medium mb-1"
+              >
+                Your Name
+              </label>
+              <Input
+                id="claimName"
+                value={claimName}
+                onChange={(e) => setClaimName(e.target.value)}
+                placeholder="Enter your name"
+                className="w-full"
+              />
+            </div>
+
+            <Button
+              onClick={handleClaimEntry}
+              disabled={!claimName.trim() || isClaimingEntry}
+              className="w-full"
+            >
+              {isClaimingEntry ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Claiming...
+                </>
+              ) : (
+                "Claim Entry"
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
+      {claimSuccess && (
+        <div className="w-full max-w-md mt-6 p-4 border rounded-lg bg-green-50 text-green-800 shadow-sm">
+          <h2 className="font-bold mb-2 text-center">Success!</h2>
+          <p className="text-center">
+            You have successfully claimed this path as {claimName}.
+          </p>
         </div>
       )}
     </main>
