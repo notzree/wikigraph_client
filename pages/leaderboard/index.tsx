@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { GetServerSideProps } from "next";
 import { format } from "date-fns";
+import { useRouter } from "next/router";
 import {
   Table,
   TableBody,
@@ -20,11 +21,13 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Trophy, ArrowRight, Calendar, User } from "lucide-react";
+import { Trophy, ArrowRight, Calendar, User, Search } from "lucide-react";
 import GetLeaderboard, {
+  type LeaderboardEntry,
   type LeaderboardResponse,
 } from "@/api_wrapper/leaderboard";
 import Head from "next/head";
+import { Button } from "@/components/ui/button";
 
 interface LeaderboardPageProps {
   leaderboardData: LeaderboardResponse | null;
@@ -36,9 +39,22 @@ export default function LeaderboardPage({
   error,
 }: LeaderboardPageProps) {
   const [loading, setLoading] = useState<boolean>(false);
+  const router = useRouter();
 
   const formatDate = (dateString: string) => {
     return format(new Date(dateString), "MMM d, yyyy");
+  };
+
+  const handleSearchClick = (entry: LeaderboardEntry) => {
+    router.push({
+      pathname: "/",
+      query: {
+        fromTitle: entry.fromTitle,
+        fromOffset: entry.fromOffset,
+        toTitle: entry.toTitle,
+        toOffset: entry.toOffset,
+      },
+    });
   };
 
   return (
@@ -91,6 +107,7 @@ export default function LeaderboardPage({
                   <TableHead className="hidden md:table-cell">User</TableHead>
                   <TableHead className="hidden md:table-cell">Date</TableHead>
                   <TableHead className="text-right">Length</TableHead>
+                  <TableHead className="w-24">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -128,6 +145,17 @@ export default function LeaderboardPage({
                       <Badge variant={index < 3 ? "default" : "secondary"}>
                         {entry.length} steps
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full flex items-center gap-1"
+                        onClick={() => handleSearchClick(entry)}
+                      >
+                        <Search className="h-3 w-3" />
+                        <span className="hidden sm:inline">Search</span>
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}

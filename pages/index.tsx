@@ -1,5 +1,4 @@
-"use client";
-
+import { useRouter } from "next/router";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +13,7 @@ import { ClaimEntry } from "@/api_wrapper/rank";
 import Link from "next/link";
 
 export default function Home() {
+  const router = useRouter();
   // From input state
   const [fromSearchValue, setFromSearchValue] = useState<string>("");
   const [fromSelectedValue, setFromSelectedValue] = useState<string>("");
@@ -59,7 +59,34 @@ export default function Home() {
   const [isClaimingEntry, setIsClaimingEntry] = useState<boolean>(false);
   const [claimError, setClaimError] = useState<string | null>(null);
   const [claimSuccess, setClaimSuccess] = useState<boolean>(false);
+  useEffect(() => {
+    // Check for query parameters on page load
+    const { fromTitle, fromOffset, toTitle, toOffset } = router.query;
 
+    if (fromTitle && typeof fromTitle === "string") {
+      setFromSearchValue(fromTitle);
+      if (fromOffset && typeof fromOffset === "string") {
+        setFromSelectedValue(fromOffset);
+        // Create a mock CompletionResult to set as the selected item
+        setFromSelectedItem({
+          Title: fromTitle,
+          Offset: Number.parseInt(fromOffset, 10),
+        });
+      }
+    }
+
+    if (toTitle && typeof toTitle === "string") {
+      setToSearchValue(toTitle);
+      if (toOffset && typeof toOffset === "string") {
+        setToSelectedValue(toOffset);
+        // Create a mock CompletionResult to set as the selected item
+        setToSelectedItem({
+          Title: toTitle,
+          Offset: Number.parseInt(toOffset, 10),
+        });
+      }
+    }
+  }, [router.query]);
   // Fetch suggestions for "From" input
   useEffect(() => {
     const fetchFromSuggestions = async () => {
